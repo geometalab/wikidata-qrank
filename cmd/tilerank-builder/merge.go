@@ -5,7 +5,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"io"
 	"strconv"
 )
@@ -18,13 +17,36 @@ func mergeTileCounts(r []io.Reader, out chan<- TileCount, ctx context.Context) e
 	}
 
 	if len(r) > 1 {
-		fmt.Println("*** TODO: Should implement k-way merge.")
-		fmt.Println("*** Currently, only one single week is getting processed")
+		// Add readers to heap
+		tch := make(TileCountHeap, 0)
+		for i := 0; i < len(r); i++ {
+			reader := r[i]
+			scanner := bufio.NewScanner(reader)
+			if scanner.Scan() {
+				firstLine := scanner.Text()
+				tch.Push(&TileCountReader{scanner: *scanner, tc: TileCountFromString(firstLine)})
+			}
+		}
+
+		// Do until heap is empty
+		for tch.Len() != 0 {
+			toPush := tch[0].tc
+			print(toPush.ToString(), " \n")
+			out <- toPush
+			// If reader still has lines
+			if tch[0].scanner.Scan() {
+				nextLine := tch[0].scanner.Text()
+				tch.fix(tch[0], TileCountFromString(nextLine), tch[0].scanner)
+			} else {
+				tch.Pop()
+			}
+		}
 	}
+	print("\n")
 
 	scanner := bufio.NewScanner(r[len(r)-1])
 	for scanner.Scan() {
-		// Check if our task has been canceled. Typically this can happen
+		// Check if our task has been canceled. Typically, this can happen
 		// because of an error in another goroutine in the same x.sync.errroup.
 		select {
 		case <-ctx.Done():

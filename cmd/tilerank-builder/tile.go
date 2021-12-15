@@ -5,10 +5,11 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/lanrat/extsort"
 	"math"
 	"math/bits"
-
-	"github.com/lanrat/extsort"
+	"strconv"
+	"strings"
 )
 
 // TileLatitude returns the latitude of a web mercator tile’s northern edge,
@@ -128,13 +129,20 @@ type TileCount struct {
 // ToBytes serializes a TileCount into a byte array.
 func (c TileCount) ToBytes() []byte {
 	zoom, x, y := c.Key.ZoomXY()
-	var buf [binary.MaxVarintLen32*2 + binary.MaxVarintLen64 + 1]byte
-	pos := binary.PutUvarint(buf[:], uint64(x))
+	buf := make([]byte, binary.MaxVarintLen32*2+binary.MaxVarintLen64+1)
+	pos := binary.PutUvarint(buf, uint64(x))
 	pos += binary.PutUvarint(buf[pos:], uint64(y))
 	pos += binary.PutUvarint(buf[pos:], c.Count)
 	buf[pos] = zoom
 	pos += 1
 	return buf[0:pos]
+}
+
+func (c TileCount) ToString() string {
+	coords := c.Key.String()
+	count := c.Count
+	returnString := coords + " " + strconv.Itoa(int(count))
+	return returnString
 }
 
 // TileCountFromBytes de-serializes a TileCount from a byte array.
@@ -149,6 +157,18 @@ func TileCountFromBytes(b []byte) extsort.SortType {
 	zoom := b[pos]
 	key := MakeTileKey(zoom, uint32(x), uint32(y))
 	return TileCount{Key: key, Count: count}
+}
+
+func TileCountFromString(s string) TileCount {
+	splitString := strings.Split(s, " ")
+	coords := splitString[0]
+	count, _ := strconv.Atoi(splitString[1])
+	splitCoords := strings.Split(coords, "/")
+
+	z, _ := strconv.Atoi(splitCoords[0])
+	x, _ := strconv.Atoi(splitCoords[1])
+	y, _ := strconv.Atoi(splitCoords[2])
+	return TileCount{Count: uint64(count), Key: MakeTileKey(uint8(z), uint32(x), uint32(y))}
 }
 
 // TileCountLess returns true if TileCount a should be sorted before b.
